@@ -172,6 +172,16 @@ def request_region(region_id):
                               mimetype="application/json")
 
 
+@app.route("/updateRegionComplete", methods=["POST"])
+def region_update_completion():
+    region_ids = request.json["regions"]
+    handler.region_update_completion_handler(region_ids)
+
+    return app.response_class(response=json.dumps({"task_result": 0}),
+                              status=200,
+                              mimetype="application/json")
+
+                              
 @app.after_request
 def after_request(response):
     timestamp = strftime('[%Y-%b-%d %H:%M]')
