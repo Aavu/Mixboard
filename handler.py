@@ -27,6 +27,18 @@ def create_library(self, ip):
     redis.json().set(ip, '$', UserLibrary().to_json())
     return 0
 
+@celery_app.task(name="handle_session_end", bind=True)
+def handle_session_end(self, userId):
+    redis = Redis(host='127.0.0.1', port=REDIS_PORT)
+    print(f"Session ended for {userId}")
+    # TODO: Clean up temp directories
+    redis.json().delete(userId)
+    return 0
+
+
+@celery_app.task(name="region_update_completion_handler", bind=True)
+def region_update_completion_handler(self, regionIds):
+    print("Region update complete")
 
 @celery_app.task(name="create_task", bind=True)
 def create_task(self, data, user_id):
