@@ -15,7 +15,7 @@ class StemType(Enum):
 
 
 class SongSection(Enum):
-    First= 0
+    First = 0
     Start = 1
     Middle = 2
     End = 3

@@ -32,7 +32,7 @@ class Segment:
         self.audio_path = os.path.join(elastique_tmp_dir, f"{self._region.id}.{FILE_TYPE}")
         self.stretched_audio_path = os.path.join(elastique_tmp_dir, f"{self._region.id}_stretched.{FILE_TYPE}")
 
-        self._segment_path, self._is_new_segment = self.create_segment()
+        self._segment_path, self.bound, self._is_new_segment = self.create_segment()
 
     @property
     def segment_id(self):
@@ -62,7 +62,7 @@ class Segment:
         return self._is_new_segment
 
     # Public method
-    def create_segment(self) -> (str, bool):
+    def create_segment(self) -> (str, (float, float), bool):
         fname = f"{self._song.get_name()}/{self.stem_type.value}"
 
         bar_length = self._region.w
@@ -105,7 +105,7 @@ class Segment:
         # Export segment
         segment.fade_in(10).fade_out(10).export(self.audio_path, format="adts")
 
-        return self.audio_path, True
+        return self.audio_path, bounds, True
 
     # Private methods
     def __segment_ready(self) -> bool:
@@ -118,7 +118,9 @@ class Segment:
         num_loops = 1
         while True:
             non_silent_bounds = self._song.get_non_silent_bounds(self.stem_type, quantized_bar_length)
-            if non_silent_bounds:
+            non_silent_bounds = self.__remove_last_chosen_segment(non_silent_bounds)
+
+            if non_silent_bounds is not None and len(non_silent_bounds) > 0:
                 break
 
             quantized_bar_length /= 2
@@ -131,27 +133,57 @@ class Segment:
         bounds = self.__choose_segment(non_silent_bounds, corrected_bar_length, quantized_bar_length)
         return bounds, num_loops
 
+    def __remove_last_chosen_segment(self, non_silent_bounds: list or None) -> list or None:
+        if non_silent_bounds is None:
+            return None
+
+        out = []
+        val = None
+
+        if self._region.item.bound is not None:
+            val = self._region.item.bound.start
+
+        if val is None:
+            logger.debug("Warn: No value found for in_time. Not filtering last chosen segment")
+            return non_silent_bounds
+
+        val = val / 44100.0 # TODO: Fix hard coded sample rate
+        # since the values are floats, there is no guarentee for it to match the contents of the bounds array
+        lb = val - 0.1
+        rb = val + 0.1
+
+        for t in non_silent_bounds:
+            if not lb < t < rb:
+                out.append(t)
+            else:
+                logger.debug(f"Filtered last segment with time {t}")
+
+        return out
+
     def __choose_segment(self, non_silent_bounds, bar_length, quantized_bar_length):
+        song_section = self.song_section
         if not len(non_silent_bounds) >= 3:
             song_section = SongSection.Any  # Making up for len(non_silent_bounds) == 1
 
         bound = 0
-        if self.song_section == SongSection.Any:
-            bound = np.random.choice(len(non_silent_bounds))  # Select randomly from the entire song
-        elif self.song_section == SongSection.First:
-            bound = 0
-        elif self.song_section == SongSection.Start:
+        # if song_section == SongSection.Any:
+        #     bound = np.random.choice(len(non_silent_bounds))  # Select randomly from the entire song
+        # elif song_section == SongSection.First:
+        #     bound = 0
+        if song_section == SongSection.Start:
             bound = np.random.choice(len(non_silent_bounds) // 3)  # Select randomly from first third of the song
-        elif self.song_section == SongSection.Middle:
+        elif song_section == SongSection.Middle:
             s = len(non_silent_bounds) // 3
             e = (len(non_silent_bounds) // 3 * 2) + 1  # Add 1 since randint picks from a half open interval [low, high)
             bound = np.random.randint(s, e)  # Select randomly between 1/3 and 2/3 of the song
-        elif self.song_section == SongSection.End:
+        elif song_section == SongSection.End:
             s = len(non_silent_bounds) // 3 * 2
             e = len(non_silent_bounds)
             bound = np.random.randint(s, e)  # Select randomly between 2/3 and end of song
-        elif self.song_section == SongSection.Last:
-            bound = len(non_silent_bounds) - 1
+        # elif song_section == SongSection.Last:
+        #     bound = len(non_silent_bounds) - 1
+        else:
+            bound = np.random.choice(len(non_silent_bounds))  # Select randomly from the entire song
 
         logger.debug(f"Song: {self._song.get_name()}, section: {self.song_section.name}, Bound: {bound}")
         segment_start_in_samps = int(non_silent_bounds[bound] * self._song.get_fs())
@@ -233,16 +265,15 @@ class Segment:
             return SongSection.Any
 
         position = self._region.x
-        end_bar = self._region.x + self._region.w
-        song_section = SongSection.First
-        if position == 0:
-            song_section = SongSection.First
-        elif position < 8:
+        # end_bar = self._region.x + self._region.w
+        # if position == 0:
+        #     song_section = SongSection.First
+        if position < 8:
             song_section = SongSection.Start
         elif 8 <= position < 24:
             song_section = SongSection.Middle
-        elif position >= 24:
+        else:
             song_section = SongSection.End
-        if position >= 24 and end_bar == 32:
-            song_section = SongSection.Last
+        # if position >= 24 and end_bar == 32:
+        #     song_section = SongSection.Last
         return song_section

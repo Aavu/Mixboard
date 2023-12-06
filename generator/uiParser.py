@@ -5,12 +5,30 @@ import json
 from .modules.enums import StemType, SongSection, State
 
 
+class Bound:
+    def __init__(self, start: float = None, end: float = None, bound: dict = None):
+        if bound is not None:
+            self.start = bound.get("start")
+            self.end = bound.get("end")
+        else:
+            self.start = start
+            self.end = end
+
+    def __str__(self):
+        return f"in_time: {self.start}, out_time: {self.end}"
+
+
 class Item:
-    def __init__(self, song_id: str = None, item: dict = None):
+    def __init__(self, song_id: str = None, start: float = None, end: float = None, item: dict = None):
         if item is not None:
             self.song_id = item.get("songId")
+            self.bound = Bound(bound=item.get("bound"))
         else:
             self.song_id = song_id
+            self.bound = Bound(start=start, end=end)
+
+    def __str__(self):
+        return f"song_id: {self.song_id}, bound: {self.bound}"
 
 
 class Region:
@@ -35,7 +53,7 @@ class Region:
             self.item = Item(song_id=song_id)
 
     def __str__(self):
-        return f"id: {self.id}, x: {self.x}, w: {self.w}, state: {self.state.value}, song_id: {self.item.song_id}"
+        return f"id: {self.id}, x: {self.x}, w: {self.w}, state: {self.state.value}, item: {self.item}"
 
 
 class Layout:

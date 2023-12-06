@@ -115,10 +115,12 @@ class Generator:
 
         print(f"Create segment for {region.id}")
         if self.segment_queue:
-            self.segment_queue.put((segment.segment_id, segment.path, segment.position_samples), block=False)
+            self.segment_queue.put(
+                (segment.segment_id, segment.path, segment.position_samples, region.stem_type.value, segment.bound),
+                block=False)
             logger.debug(f"Put {segment.segment_id} in queue")
         else:
-            return segment.segment_id, segment.path, segment.position_samples
+            return segment.segment_id, segment.path, segment.position_samples, region.stem_type.value, segment.bound
 
     def generate_mashup(self):
         redis = Redis(host='127.0.0.1', port=6379)
@@ -142,12 +144,19 @@ class Generator:
         self.generate_all_segments()
 
         for _ in regions:
-            region_id, path, position = self.segment_queue.get()
+            region_id, path, position, lane, (start, end) = self.segment_queue.get()
             if path:
                 with open(path, 'rb') as f:
                     snd = base64.b64encode(f.read()).decode('UTF-8')
                 tempo, _ = self.user_library.get_optimal_tempo()
-                data = {"id": region_id, "snd": snd, "tempo": tempo, "position": position, "valid": True}
+                data = {"id": region_id,
+                        "snd": snd,
+                        "tempo": tempo,
+                        "position": position,
+                        "lane": lane,
+                        "valid": True,
+                        "start": start,
+                        "end": end}
                 redis.json().set(region_id, '$', data)
             else:
                 logger.warning(f"block empty for segment: {region_id}")

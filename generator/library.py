@@ -15,6 +15,11 @@ class Library:
         self.metadata = None
         self.load_songs()
 
+    def load_song_ids(self):
+        for dir in os.listdir(self._audio_path):
+            if os.path.isdir(dir):
+                self._song_ids.append(dir)
+
     def _get_song_metadata(self, song_id):
         file_path = os.path.join(self._audio_path, song_id, 'metadata.json')
         with open(file_path, 'r') as f:
@@ -22,9 +27,6 @@ class Library:
         return data
 
     def load_songs(self):
-        if not os.path.exists(self._audio_path):
-            os.makedirs(self._audio_path)
-
         for id in os.listdir(self._audio_path):
             if os.path.isdir(os.path.join(self._audio_path, id)):
                 if id not in self.songs.keys():
