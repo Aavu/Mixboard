@@ -6,7 +6,7 @@ from billiard import Process, Queue
 from .segment import Segment
 from .uiParser import UiParser, Region, Stem
 from pydub import AudioSegment
-from .config.config import STEMS_DIR, OUTPUT_FILE_PATH, OUT_FILE_TYPE, DOWNLOAD_FOLDER
+from .config.config import STEMS_DIR, OUTPUT_FILE_PATH, OUT_FILE_TYPE, DOWNLOAD_FOLDER, REDIS_PORT
 import os
 import base64
 from . import utils
@@ -123,7 +123,7 @@ class Generator:
             return segment.segment_id, segment.path, segment.position_samples, region.stem_type.value, segment.bound
 
     def generate_mashup(self):
-        redis = Redis(host='127.0.0.1', port=6379)
+        redis = Redis(host='127.0.0.1', port=REDIS_PORT)
 
         # Generate music and return the data
         logger.info("Generating Mashup")

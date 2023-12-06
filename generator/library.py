@@ -33,6 +33,8 @@ class Library:
                     print(f"Loading song : {id}")
                     self.songs[id] = Song(id)
 
+        print(f"{len(self.songs)} songs loaded")
+
     def load_metadata(self):
         metadata = {"version": "1.0",
                     "statusCode": 200,

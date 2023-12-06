@@ -7,25 +7,27 @@ from celery.result import AsyncResult
 from redis import Redis
 from generator.song import Song
 from generator.logger import logger
-from generator.config.config import DOWNLOAD_FOLDER
+from generator.config.config import DOWNLOAD_FOLDER, REDIS_PORT
 from generator.library import UserLibrary
 from generator.exceptions import *
 from generator.uiParser import UiParser
 
-celery_app = Celery(__name__, backend='redis://127.0.0.1:6379', broker='redis://127.0.0.1:6379')
+celery_app = Celery(__name__, backend=f'redis://127.0.0.1:{REDIS_PORT}', broker=f'redis://127.0.0.1:{REDIS_PORT}')
 
 
 @celery_app.task(name="create_library", bind=True)
 def create_library(self, ip):
     logger.create_log()
     logger.debug(f"New library for {ip}")
-    redis = Redis(host='127.0.0.1', port=6379)  # Redis Connection operation is super cheap. DO NOT create a globals
+    redis = Redis(host='127.0.0.1',
+                  port=REDIS_PORT)  # Redis Connection operation is super cheap. DO NOT create a globals
     for key in redis.scan_iter(f"{ip}:*"):
         logger.debug(f"deleting {key} from redis cache")
         redis.delete(key)
 
     redis.json().set(ip, '$', UserLibrary().to_json())
     return 0
+
 
 @celery_app.task(name="handle_session_end", bind=True)
 def handle_session_end(self, userId):
@@ -40,9 +42,10 @@ def handle_session_end(self, userId):
 def region_update_completion_handler(self, regionIds):
     print("Region update complete")
 
+
 @celery_app.task(name="create_task", bind=True)
 def create_task(self, data, user_id):
-    redis = Redis(host='127.0.0.1', port=6379)
+    redis = Redis(host='127.0.0.1', port=REDIS_PORT)
     lib = UserLibrary(user_lib_data=redis.json().get(user_id))
     ui_data = UiParser(data)
     # song_ids = ui_data.selected_songs
@@ -67,14 +70,15 @@ def create_task(self, data, user_id):
     #         # load the songs anyway
 
     data_back = Generator(user_id, ui_data, lib, self).generate_mashup()
-    logger.info(
-        "--------------------------------------------------------")  # Separate between different mashups within session
+
+    # Separate between different mashups within session
+    logger.info("--------------------------------------------------------")
     return data_back
 
 
 @celery_app.task(name="add_track", bind=True)
 def add_track(self, song_id, ip):
-    redis = Redis(host='127.0.0.1', port=6379)
+    redis = Redis(host='127.0.0.1', port=REDIS_PORT)
     if redis.exists(ip):
         lib = UserLibrary(user_lib_data=redis.json().get(ip))
 
@@ -107,7 +111,7 @@ def add_track(self, song_id, ip):
 
 @celery_app.task(name="remove_track", bind=True)
 def remove_track(self, song_id, ip):
-    redis = Redis(host='127.0.0.1', port=6379)
+    redis = Redis(host='127.0.0.1', port=REDIS_PORT)
 
     if redis.exists(ip):
         redis.sadd(f"{ip}:task_id", self.request.id)
@@ -120,14 +124,15 @@ def remove_track(self, song_id, ip):
 
 
 def request_region(region_id):
-    redis = Redis(host='127.0.0.1', port=6379)
+    redis = Redis(host='127.0.0.1', port=REDIS_PORT)
     if redis.exists(region_id):
         data = redis.json().get(region_id)
         redis.json().delete(region_id)
         return data
 
     print(f"No region with id {region_id} found in redis")
-    return {"id": region_id, "snd": "", "tempo": -1, "position": 0, "valid": False}
+    return {"id": region_id, "snd": "", "tempo": -1, "position": 0, "lane": "", "valid": False,
+            "start": 0, "end": 0}
 
 
 @celery_app.task

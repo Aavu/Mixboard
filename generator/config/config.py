@@ -26,6 +26,8 @@ OUT_FILE_TYPE = "aac"
 import os
 from pathlib import Path
 
+REDIS_PORT = 6379
+
 LOCK_FILE = "downloadLock"
 SONGS_FOLDER = os.path.join(Path(__file__).parent, "songs", "fullSongs")
 DOWNLOAD_FOLDER = os.path.join(Path(__file__).parent.parent, "songs", "fullSongs")
